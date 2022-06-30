@@ -5,7 +5,7 @@ use druid::{
 };
 use tracing::debug;
 
-use crate::gui::{Board, Cell, Value};
+use crate::gui::{Board, Cell, CellValue};
 
 pub struct Grid {
     display: Container<Board>,
@@ -83,7 +83,7 @@ impl Widget<Board> for Grid {
 }
 
 pub struct GridCell {
-    cell: Container<Value>,
+    cell: Container<CellValue>,
 }
 
 impl GridCell {
@@ -93,14 +93,19 @@ impl GridCell {
         }
     }
 
-    fn set_background_color(&mut self, focused: bool) {
+    fn set_background_color(&mut self, value: CellValue, focused: bool) {
         const WHITE: Color = Color::rgb8(241, 247, 255);
         const BLUE: Color = Color::rgb8(97, 158, 239);
         // const GREEN: Color = Color::rgb8(149, 190, 147);
         // const RED: Color = Color::rgb8(239, 90, 112);
 
-        let background: BackgroundBrush<_> = if focused { BLUE.into() } else { WHITE.into() };
-        self.cell.set_background(background);
+        if value.is_fixed() {
+            self.cell
+                .set_background(BackgroundBrush::from(Color::grey(0.9)));
+        } else {
+            let background: BackgroundBrush<_> = if focused { BLUE.into() } else { WHITE.into() };
+            self.cell.set_background(background);
+        }
     }
 }
 
@@ -110,36 +115,42 @@ impl Default for GridCell {
     }
 }
 
-impl Widget<Value> for GridCell {
-    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut Value, env: &Env) {
+impl Widget<CellValue> for GridCell {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut CellValue, env: &Env) {
         match event {
             Event::KeyDown(KeyEvent { key, .. }) => match key {
                 KbKey::Character(c) => {
                     debug!("Character pressed: {c}");
-                    let press: Option<usize> = c
+                    let valid_value: Option<usize> = c
                         .chars()
                         .last()
                         .and_then(|c| c.to_digit(10))
                         .and_then(|n| usize::try_from(n).ok())
                         .filter(|&n| (1..=9).contains(&n));
 
-                    if let Some(num) = press {
-                        debug!("Cell set: {num}, was {data:?}");
-                        data.0 = Some(num);
+                    if let Some(num) = valid_value {
+                        if (*data).is_fixed() {
+                            debug!("Cell set: {num}, was {data:?}");
+                            *data = CellValue::User(Some(num));
+                        }
                     }
                 }
                 KbKey::Backspace | KbKey::Delete => {
-                    debug!("Cell cleared, was {data:?}");
-                    data.0 = None;
+                    if (*data).is_fixed() {
+                        debug!("Cell cleared, was {data:?}");
+                        *data = CellValue::User(None);
+                    }
                 }
                 _ => {}
             },
             Event::MouseDown(_) => {
-                debug!("Cell clicked, toggling focus");
-                if ctx.has_focus() {
-                    ctx.resign_focus();
-                } else {
-                    ctx.request_focus();
+                if !(*data).is_fixed() {
+                    debug!("Cell clicked, toggling focus");
+                    if ctx.has_focus() {
+                        ctx.resign_focus();
+                    } else {
+                        ctx.request_focus();
+                    }
                 }
             }
             _ => {}
@@ -148,14 +159,20 @@ impl Widget<Value> for GridCell {
         self.cell.event(ctx, event, data, env);
     }
 
-    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &Value, env: &Env) {
+    fn lifecycle(
+        &mut self,
+        ctx: &mut LifeCycleCtx,
+        event: &LifeCycle,
+        data: &CellValue,
+        env: &Env,
+    ) {
         match event {
             LifeCycle::WidgetAdded => {
                 ctx.register_for_focus();
-                self.set_background_color(false);
+                self.set_background_color(*data, false);
             }
             LifeCycle::FocusChanged(focused) => {
-                self.set_background_color(*focused);
+                self.set_background_color(*data, *focused);
                 ctx.request_paint();
             }
             _ => {}
@@ -164,8 +181,8 @@ impl Widget<Value> for GridCell {
         self.cell.lifecycle(ctx, event, data, env)
     }
 
-    fn update(&mut self, ctx: &mut UpdateCtx, old_data: &Value, data: &Value, env: &Env) {
-        self.set_background_color(ctx.has_focus());
+    fn update(&mut self, ctx: &mut UpdateCtx, old_data: &CellValue, data: &CellValue, env: &Env) {
+        self.set_background_color(*data, ctx.has_focus());
         ctx.request_paint();
         // self.update_label();
         self.cell.update(ctx, old_data, data, env);
@@ -175,13 +192,13 @@ impl Widget<Value> for GridCell {
         &mut self,
         ctx: &mut LayoutCtx,
         bc: &BoxConstraints,
-        data: &Value,
+        data: &CellValue,
         env: &Env,
     ) -> Size {
         self.cell.layout(ctx, bc, data, env)
     }
 
-    fn paint(&mut self, ctx: &mut PaintCtx, data: &Value, env: &Env) {
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &CellValue, env: &Env) {
         self.cell.paint(ctx, data, env);
     }
 }

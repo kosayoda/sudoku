@@ -4,5 +4,5 @@ mod cell;
 mod grid;
 
 pub use board::Board;
-pub use cell::{Cell, Value};
+pub use cell::{Cell, CellValue};
 pub use grid::{Grid, GridCell};
