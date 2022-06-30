@@ -260,8 +260,8 @@ impl From<&Board> for Solver {
             next_square_candidate: None,
         };
 
-        for (x, row) in (*value).squares().iter().enumerate() {
-            for (y, cell) in row.iter().enumerate() {
+        for (y, row) in (*value).squares().iter().enumerate() {
+            for (x, cell) in row.iter().enumerate() {
                 if *cell > 0 {
                     let adjusted_cell = *cell - 1;
                     solver

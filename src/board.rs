@@ -29,7 +29,7 @@ impl TryFrom<&str> for Board {
     type Error = Report;
 
     fn try_from(value: &str) -> Result<Self> {
-        let mut squares = [[0x1ff_usize; 9]; 9];
+        let mut squares = [[0_usize; 9]; 9];
 
         let length = value.chars().count();
         if length != 81 {
@@ -40,7 +40,7 @@ impl TryFrom<&str> for Board {
             let y = index.div_euclid(9);
 
             if let Some(pos) = cell.to_digit(10) {
-                squares[y][x] = pos as usize;
+                squares[x][y] = pos as usize;
             } else {
                 return Err(eyre!(BoardError::InvalidCell { index, cell }));
             }

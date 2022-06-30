@@ -1,4 +1,5 @@
 pub mod board;
+pub mod gui;
 pub mod solver;
 
 use std::fmt::{Display, Write};
