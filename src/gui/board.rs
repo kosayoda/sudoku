@@ -2,18 +2,18 @@ use color_eyre::{eyre::eyre, Report, Result};
 use druid::{Data, Lens};
 use tracing::debug;
 
-use crate::gui::Cell;
+use crate::gui::Value;
 
 #[derive(Clone, Copy, Data, Default, Lens)]
 pub struct Board {
-    pub cells: [[Cell; 9]; 9],
+    pub cells: [[Value; 9]; 9],
 }
 
 impl TryFrom<&str> for Board {
     type Error = Report;
 
     fn try_from(value: &str) -> Result<Self> {
-        let mut cells = [[Cell::default(); 9]; 9];
+        let mut cells = [[Value::default(); 9]; 9];
 
         let length = value.chars().count();
         if length != 81 {
@@ -26,7 +26,7 @@ impl TryFrom<&str> for Board {
 
             if let Some(Ok(pos)) = cell.to_digit(10).map(usize::try_from) {
                 if pos > 0 {
-                    cells[x][y].value = Some(pos);
+                    cells[x][y] = Value(Some(pos));
                 }
             } else {
                 return Err(eyre!("Invalid cell '{cell}' at index: {index}"));

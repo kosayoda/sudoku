@@ -83,42 +83,23 @@ impl Widget<Board> for Grid {
 }
 
 pub struct GridCell {
-    cell: Container<Cell>,
+    cell: Container<Value>,
 }
 
 impl GridCell {
     pub fn new() -> Self {
         Self {
-            cell: Self::create_label()
-                .center()
-                .background(Color::WHITE)
-                .border(Color::grey(0.5), 0.5),
+            cell: Cell::new().center().border(Color::grey(0.5), 0.5),
         }
     }
 
-    fn create_label() -> impl Widget<Cell> {
-        Label::dynamic(|c: &Cell, _env| {
-            if let Some(val) = c.value {
-                format!("{}", val)
-            } else {
-                String::new()
-            }
-        })
-        .with_text_size(48.0)
-        .with_text_color(Color::BLACK)
-    }
-
-    fn set_background_color(&mut self, data: &Cell, focused: bool) {
+    fn set_background_color(&mut self, focused: bool) {
         const WHITE: Color = Color::rgb8(241, 247, 255);
         const BLUE: Color = Color::rgb8(97, 158, 239);
-        const GREEN: Color = Color::rgb8(149, 190, 147);
-        const RED: Color = Color::rgb8(239, 90, 112);
+        // const GREEN: Color = Color::rgb8(149, 190, 147);
+        // const RED: Color = Color::rgb8(239, 90, 112);
 
-        let background: BackgroundBrush<_> = match focused {
-            true => BLUE.into(),
-            false => WHITE.into(),
-        };
-
+        let background: BackgroundBrush<_> = if focused { BLUE.into() } else { WHITE.into() };
         self.cell.set_background(background);
     }
 }
@@ -129,14 +110,13 @@ impl Default for GridCell {
     }
 }
 
-impl Widget<Cell> for GridCell {
-    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut Cell, env: &Env) {
-        let mut input = data.value;
+impl Widget<Value> for GridCell {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut Value, env: &Env) {
         match event {
             Event::KeyDown(KeyEvent { key, .. }) => match key {
                 KbKey::Character(c) => {
                     debug!("Character pressed: {c}");
-                    let press: Option<Value> = c
+                    let press: Option<usize> = c
                         .chars()
                         .last()
                         .and_then(|c| c.to_digit(10))
@@ -144,13 +124,13 @@ impl Widget<Cell> for GridCell {
                         .filter(|&n| (1..=9).contains(&n));
 
                     if let Some(num) = press {
-                        debug!("Cell set: {num}, was {input:?}");
-                        input = Some(num);
+                        debug!("Cell set: {num}, was {data:?}");
+                        data.0 = Some(num);
                     }
                 }
                 KbKey::Backspace | KbKey::Delete => {
-                    debug!("Cell cleared, was {input:?}");
-                    input = None;
+                    debug!("Cell cleared, was {data:?}");
+                    data.0 = None;
                 }
                 _ => {}
             },
@@ -165,34 +145,43 @@ impl Widget<Cell> for GridCell {
             _ => {}
         };
 
-        data.value = input;
         self.cell.event(ctx, event, data, env);
     }
 
-    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &Cell, env: &Env) {
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &Value, env: &Env) {
         match event {
-            LifeCycle::WidgetAdded => ctx.register_for_focus(),
+            LifeCycle::WidgetAdded => {
+                ctx.register_for_focus();
+                self.set_background_color(false);
+            }
             LifeCycle::FocusChanged(focused) => {
-                self.set_background_color(data, *focused);
+                self.set_background_color(*focused);
                 ctx.request_paint();
             }
             _ => {}
         }
 
-        self.cell.lifecycle(ctx, event, data, env);
+        self.cell.lifecycle(ctx, event, data, env)
     }
 
-    fn update(&mut self, ctx: &mut UpdateCtx, old_data: &Cell, data: &Cell, env: &Env) {
-        self.set_background_color(data, ctx.has_focus());
+    fn update(&mut self, ctx: &mut UpdateCtx, old_data: &Value, data: &Value, env: &Env) {
+        self.set_background_color(ctx.has_focus());
         ctx.request_paint();
+        // self.update_label();
         self.cell.update(ctx, old_data, data, env);
     }
 
-    fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, data: &Cell, env: &Env) -> Size {
+    fn layout(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        bc: &BoxConstraints,
+        data: &Value,
+        env: &Env,
+    ) -> Size {
         self.cell.layout(ctx, bc, data, env)
     }
 
-    fn paint(&mut self, ctx: &mut PaintCtx, data: &Cell, env: &Env) {
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &Value, env: &Env) {
         self.cell.paint(ctx, data, env);
     }
 }
