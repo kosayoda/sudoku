@@ -1,47 +1,53 @@
 use druid::{
     widget::{BackgroundBrush, Container, Flex, Widget, WidgetExt},
-    BoxConstraints, Color, Env, Event, EventCtx, KbKey, KeyEvent, LayoutCtx, LensExt, LifeCycle,
+    BoxConstraints, Env, Event, EventCtx, KbKey, KeyEvent, LayoutCtx, LensExt, LifeCycle,
     LifeCycleCtx, PaintCtx, Size, UpdateCtx, WidgetId,
 };
 use tracing::debug;
 
-use crate::gui::{AppData, Board, Cell, CellValue};
+use crate::{
+    config::Config,
+    gui::{AppData, Board, Cell, CellValue, Keys},
+};
+
+const CELL_FLEX: f64 = 1.0;
+const BLOCK_SPACER_FLEX: f64 = 0.05;
+const TOTAL_FLEX: f64 = CELL_FLEX * 9.0 + BLOCK_SPACER_FLEX * 2.0;
 
 pub struct Grid {
     display: Container<AppData>,
 }
 
 impl Grid {
-    pub fn new(spacer_flex: f64) -> Self {
+    pub fn new(cfg: &Config) -> Self {
         let mut column = Flex::column();
         for y in 0..9 {
             let mut row = Flex::row();
 
             if y % 3 == 0 && y != 0 {
-                column.add_flex_spacer(spacer_flex);
+                column.add_flex_spacer(BLOCK_SPACER_FLEX);
             }
 
             for x in 0..9 {
                 if x % 3 == 0 && x != 0 {
-                    row.add_flex_spacer(spacer_flex);
+                    row.add_flex_spacer(BLOCK_SPACER_FLEX);
                 }
 
-                let id: u16 = (y * 9 + x)
-                    .try_into()
-                    .expect("Cannot assign u16 id to a grid cell!");
                 row.add_flex_child(
-                    GridCell::new(id).lens(
+                    GridCell::new(x, y, cfg).lens(
                         AppData::board.then(Board::cells.as_ref().index(x).as_ref().index(y)),
                     ),
-                    1.0,
+                    CELL_FLEX,
                 );
             }
 
-            column.add_flex_child(row, 1.0);
+            column.add_flex_child(row, CELL_FLEX);
         }
 
         Self {
-            display: column.center().background(Color::BLACK),
+            display: column
+                .center()
+                .background(BackgroundBrush::ColorKey(Keys::THEME_GRID_BG)),
         }
     }
 }
@@ -54,9 +60,8 @@ impl Widget<AppData> for Grid {
         data: &AppData,
         env: &Env,
     ) -> Size {
-        let total_flex = 9.0 + data.config.gui.grid.block_spacer_width * 2.0;
         let mut side = bc.max().min_side();
-        side = side - (side % total_flex);
+        side = side - (side % TOTAL_FLEX);
         let size = Size::new(side, side);
         let constraints = BoxConstraints::new(size, size);
         self.display.layout(ctx, &constraints, data, env)
@@ -84,29 +89,30 @@ pub struct GridCell {
 }
 
 impl GridCell {
-    pub fn new(id: u16) -> Self {
+    pub fn new(x: usize, y: usize, cfg: &Config) -> Self {
+        let id: u16 = (y * 9 + x)
+            .try_into()
+            .expect("Cannot assign u16 id to a grid cell!");
         let id = WidgetId::reserved(id);
         Self {
-            cell: Cell::new()
+            cell: Cell::new(&cfg.theme)
                 .with_id(id)
                 .center()
-                .border(Color::grey(0.5), 1.0),
+                .border(Keys::THEME_CELL_BORDER, Keys::CELL_BORDER_WIDTH),
         }
     }
 
-    fn set_background_color(&mut self, value: CellValue, focused: bool) {
-        const WHITE: Color = Color::rgb8(241, 247, 255);
-        const BLUE: Color = Color::rgb8(97, 158, 239);
-        // const GREEN: Color = Color::rgb8(149, 190, 147);
-        // const RED: Color = Color::rgb8(239, 90, 112);
+    fn set_background_color(&mut self, value: CellValue, focused: bool, env: &Env) {
+        let color = match (value.is_fixed(), focused) {
+            (true, true) => {
+                unreachable!("Unexpected: Grid cell is fixed but focused at the same time!")
+            }
+            (true, false) => env.get(Keys::THEME_CELL_BG_FIXED),
+            (false, true) => env.get(Keys::THEME_CELL_BG_FOCUSED),
+            (false, false) => env.get(Keys::THEME_CELL_BG),
+        };
 
-        if value.is_fixed() {
-            self.cell
-                .set_background(BackgroundBrush::from(Color::grey(0.9)));
-        } else {
-            let background: BackgroundBrush<_> = if focused { BLUE.into() } else { WHITE.into() };
-            self.cell.set_background(background);
-        }
+        self.cell.set_background(BackgroundBrush::from(color));
     }
 }
 
@@ -162,10 +168,10 @@ impl Widget<CellValue> for GridCell {
         match event {
             LifeCycle::WidgetAdded => {
                 ctx.register_for_focus();
-                self.set_background_color(*data, false);
+                self.set_background_color(*data, false, env);
             }
             LifeCycle::FocusChanged(focused) => {
-                self.set_background_color(*data, *focused);
+                self.set_background_color(*data, *focused, env);
                 ctx.request_paint();
             }
             _ => {}
@@ -175,7 +181,7 @@ impl Widget<CellValue> for GridCell {
     }
 
     fn update(&mut self, ctx: &mut UpdateCtx, old_data: &CellValue, data: &CellValue, env: &Env) {
-        self.set_background_color(*data, ctx.has_focus());
+        self.set_background_color(*data, ctx.has_focus(), env);
         self.cell.update(ctx, old_data, data, env);
     }
 

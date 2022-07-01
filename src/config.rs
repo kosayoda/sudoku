@@ -1,30 +1,22 @@
 use druid::Color;
 use serde::{self, Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct Config {
     pub gui: GuiConfig,
     pub theme: ThemeConfig,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Copy)]
 pub struct GuiConfig {
-    pub grid: GridConfig,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct GridConfig {
     /// The border width of the each cell in pixels
     pub cell_border_width: f64,
-    /// The relative width of block spacers to cell width
-    pub block_spacer_width: f64,
 }
 
-impl Default for GridConfig {
+impl Default for GuiConfig {
     fn default() -> Self {
         Self {
             cell_border_width: 1.0,
-            block_spacer_width: 0.05,
         }
     }
 }
@@ -57,13 +49,13 @@ pub struct ThemeConfig {
 impl Default for ThemeConfig {
     fn default() -> Self {
         Self {
-            bg: Color::BLACK,
+            bg: Color::from_hex_str("#26272b").unwrap(),
             grid_bg: Color::from_hex_str("#26272b").unwrap(),
             cell_fg: Color::from_hex_str("#26272b").unwrap(),
-            cell_bg: Color::from_hex_str("#d9e9ff").unwrap(),
+            cell_bg: Color::from_hex_str("#f1f7ff").unwrap(),
             cell_bg_focused: Color::from_hex_str("#96b8e8").unwrap(),
-            cell_bg_fixed: Color::from_hex_str("#d0d2d5").unwrap(),
-            cell_border: Color::from_hex_str("#d0d2d5").unwrap(),
+            cell_bg_fixed: Color::from_hex_str("#dedfe3").unwrap(),
+            cell_border: Color::from_hex_str("#4f4f59").unwrap(),
         }
     }
 }

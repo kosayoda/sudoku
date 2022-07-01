@@ -1,22 +1,42 @@
 use std::sync::Arc;
 
 use color_eyre::Result;
-
 use druid::{AppLauncher, Data, Env, Event, EventCtx, Lens, Widget, WidgetExt, WindowDesc};
 
 use crate::config::Config;
-use crate::gui::{Board, Grid};
+use crate::gui::{Board, Grid, Keys};
+
+macro_rules! initialize_keys {
+    ($env:ident; $($key_var:ident = $key_path:expr),*) => {
+        $($env.set(Keys::$key_var, $key_path);)*
+    }
+}
 
 pub fn run() -> Result<()> {
     let board_str =
         "000075400000000008080190000300001060000000034000068170204000603900000020530200000";
     let board: Board = board_str.try_into()?;
-    let data = AppData::new(board);
+    let config = Arc::new(Config::default());
 
-    let app = App::new(&data).center();
+    let data = AppData::new(board, config.clone());
+    let app = App::new(&data).center().background(config.theme.bg.clone());
     let window = WindowDesc::new(app).resizable(true);
-    AppLauncher::with_window(window).launch(data)?;
 
+    AppLauncher::with_window(window)
+        .configure_env(move |env: &mut Env, _| {
+            initialize_keys! {
+                env;
+                CELL_BORDER_WIDTH = config.gui.cell_border_width,
+                THEME_BG = config.theme.bg.clone(),
+                THEME_GRID_BG = config.theme.grid_bg.clone(),
+                THEME_CELL_FG = config.theme.cell_fg.clone(),
+                THEME_CELL_BG = config.theme.cell_bg.clone(),
+                THEME_CELL_BG_FOCUSED = config.theme.cell_bg_focused.clone(),
+                THEME_CELL_BG_FIXED = config.theme.cell_bg_fixed.clone(),
+                THEME_CELL_BORDER = config.theme.cell_border.clone()
+            }
+        })
+        .launch(data)?;
     Ok(())
 }
 
@@ -27,11 +47,8 @@ pub struct AppData {
 }
 
 impl AppData {
-    fn new(board: Board) -> Self {
-        Self {
-            board,
-            ..Default::default()
-        }
+    fn new(board: Board, config: Arc<Config>) -> Self {
+        Self { board, config }
     }
 }
 
@@ -42,7 +59,7 @@ struct App {
 impl App {
     fn new(data: &AppData) -> Self {
         Self {
-            grid: Grid::new(data.config.gui.grid.block_spacer_width),
+            grid: Grid::new(&data.config),
         }
     }
 }

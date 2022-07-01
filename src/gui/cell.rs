@@ -1,9 +1,11 @@
 use std::fmt::Display;
 
 use druid::{
-    widget::Label, BoxConstraints, Color, Data, Env, Event, EventCtx, LayoutCtx, LifeCycle,
-    LifeCycleCtx, PaintCtx, Size, UpdateCtx, Widget,
+    widget::Label, BoxConstraints, Data, Env, Event, EventCtx, LayoutCtx, LifeCycle, LifeCycleCtx,
+    PaintCtx, Size, UpdateCtx, Widget,
 };
+
+use crate::config::ThemeConfig;
 
 #[derive(Data, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CellValue {
@@ -53,16 +55,10 @@ pub struct Cell {
 }
 
 impl Cell {
-    pub fn new() -> Self {
-        let label =
-            Label::dynamic(|c: &CellValue, _env| format!("{}", *c)).with_text_color(Color::BLACK);
+    pub fn new(theme_cfg: &ThemeConfig) -> Self {
+        let label = Label::dynamic(|c: &CellValue, _env| format!("{}", *c))
+            .with_text_color(theme_cfg.cell_fg.clone());
         Self { label }
-    }
-}
-
-impl Default for Cell {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
