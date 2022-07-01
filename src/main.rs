@@ -2,7 +2,7 @@ use color_eyre::Result;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 
-use ukodus::gui;
+use sudoku::gui;
 
 fn main() -> Result<()> {
     color_eyre::install()?;

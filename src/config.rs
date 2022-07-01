@@ -1,4 +1,4 @@
-use druid::{Color, Key};
+use druid::Color;
 use serde::{self, Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Default)]
@@ -18,31 +18,15 @@ pub struct GridConfig {
     pub cell_border_width: f64,
     /// The relative width of block spacers to cell width
     pub block_spacer_width: f64,
-    #[serde(skip)]
-    #[serde(default = "default_cell_border_width_key")]
-    pub cell_border_width_key: Key<f64>,
-    #[serde(skip)]
-    #[serde(default = "default_block_spacer_width_key")]
-    pub block_spacer_width_key: Key<f64>,
 }
 
 impl Default for GridConfig {
     fn default() -> Self {
         Self {
             cell_border_width: 1.0,
-            cell_border_width_key: default_cell_border_width_key(),
             block_spacer_width: 0.05,
-            block_spacer_width_key: default_block_spacer_width_key(),
         }
     }
-}
-
-fn default_cell_border_width_key() -> Key<f64> {
-    Key::new("ukodus.grid.cell-border-width")
-}
-
-fn default_block_spacer_width_key() -> Key<f64> {
-    Key::new("ukodus.grid.block-spacer-width")
 }
 
 #[derive(Serialize, Deserialize, Debug)]

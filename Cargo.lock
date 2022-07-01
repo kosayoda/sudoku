@@ -1197,6 +1197,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "sudoku"
+version = "0.1.0"
+dependencies = [
+ "color-eyre",
+ "druid",
+ "owo-colors",
+ "serde",
+ "thiserror",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "syn"
 version = "1.0.98"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1372,20 +1386,6 @@ name = "ucd-trie"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56dee185309b50d1f11bfedef0fe6d036842e3fb77413abef29f8f8d1c5d4c1c"
-
-[[package]]
-name = "ukodus"
-version = "0.1.0"
-dependencies = [
- "color-eyre",
- "druid",
- "owo-colors",
- "serde",
- "thiserror",
- "toml",
- "tracing",
- "tracing-subscriber",
-]
 
 [[package]]
 name = "unic-bidi"
