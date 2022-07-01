@@ -1,6 +1,5 @@
 use color_eyre::{eyre::eyre, Report, Result};
 use druid::{Data, Lens};
-use tracing::debug;
 
 use crate::gui::CellValue;
 

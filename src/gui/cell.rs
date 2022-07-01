@@ -4,7 +4,6 @@ use druid::{
     widget::Label, BoxConstraints, Color, Data, Env, Event, EventCtx, LayoutCtx, LifeCycle,
     LifeCycleCtx, PaintCtx, Size, UpdateCtx, Widget,
 };
-use tracing::debug;
 
 #[derive(Data, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CellValue {

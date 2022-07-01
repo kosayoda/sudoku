@@ -13,7 +13,7 @@ fn main() -> Result<()> {
     tracing::subscriber::set_global_default(log_subscriber)?;
 
     info!("Launching GUI app!");
-    gui::app::run()?;
+    gui::run()?;
     info!("Exited GUI app!");
 
     Ok(())

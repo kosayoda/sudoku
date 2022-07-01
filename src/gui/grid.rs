@@ -1,38 +1,38 @@
 use druid::{
-    widget::{BackgroundBrush, Container, Flex, Painter, SizedBox, Widget, WidgetExt},
-    BoxConstraints, Color, Command, Data, Env, Event, EventCtx, KbKey, KeyEvent, LayoutCtx,
-    LensExt, LifeCycle, LifeCycleCtx, PaintCtx, RenderContext, Selector, Size, UpdateCtx, WidgetId,
+    widget::{BackgroundBrush, Container, Flex, Widget, WidgetExt},
+    BoxConstraints, Color, Env, Event, EventCtx, KbKey, KeyEvent, LayoutCtx, LensExt, LifeCycle,
+    LifeCycleCtx, PaintCtx, Size, UpdateCtx, WidgetId,
 };
 use tracing::debug;
 
-use crate::gui::{Board, Cell, CellValue};
+use crate::gui::{AppData, Board, Cell, CellValue};
 
 pub struct Grid {
-    display: Container<Board>,
+    display: Container<AppData>,
 }
 
 impl Grid {
-    pub fn new() -> Self {
-        const SPACER: f64 = 0.05;
-
+    pub fn new(spacer_flex: f64) -> Self {
         let mut column = Flex::column();
         for y in 0..9 {
             let mut row = Flex::row();
 
             if y % 3 == 0 && y != 0 {
-                column.add_flex_spacer(SPACER);
+                column.add_flex_spacer(spacer_flex);
             }
 
             for x in 0..9 {
                 if x % 3 == 0 && x != 0 {
-                    row.add_flex_spacer(SPACER);
+                    row.add_flex_spacer(spacer_flex);
                 }
 
                 let id: u16 = (y * 9 + x)
                     .try_into()
                     .expect("Cannot assign u16 id to a grid cell!");
                 row.add_flex_child(
-                    GridCell::new(id).lens(Board::cells.as_ref().index(x).as_ref().index(y)),
+                    GridCell::new(id).lens(
+                        AppData::board.then(Board::cells.as_ref().index(x).as_ref().index(y)),
+                    ),
                     1.0,
                 );
             }
@@ -46,40 +46,35 @@ impl Grid {
     }
 }
 
-impl Default for Grid {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Widget<Board> for Grid {
+impl Widget<AppData> for Grid {
     fn layout(
         &mut self,
         ctx: &mut LayoutCtx,
         bc: &BoxConstraints,
-        data: &Board,
+        data: &AppData,
         env: &Env,
     ) -> Size {
+        let total_flex = 9.0 + data.config.gui.grid.block_spacer_width * 2.0;
         let mut side = bc.max().min_side();
-        side = side - (side % 9.1);
+        side = side - (side % total_flex);
         let size = Size::new(side, side);
         let constraints = BoxConstraints::new(size, size);
         self.display.layout(ctx, &constraints, data, env)
     }
 
-    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut Board, env: &Env) {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut AppData, env: &Env) {
         self.display.event(ctx, event, data, env);
     }
 
-    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &Board, env: &Env) {
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &AppData, env: &Env) {
         self.display.lifecycle(ctx, event, data, env);
     }
 
-    fn update(&mut self, ctx: &mut UpdateCtx, old_data: &Board, data: &Board, env: &Env) {
+    fn update(&mut self, ctx: &mut UpdateCtx, old_data: &AppData, data: &AppData, env: &Env) {
         self.display.update(ctx, old_data, data, env);
     }
 
-    fn paint(&mut self, ctx: &mut PaintCtx, data: &Board, env: &Env) {
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &AppData, env: &Env) {
         self.display.paint(ctx, data, env);
     }
 }
