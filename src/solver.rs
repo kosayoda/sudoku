@@ -1,10 +1,6 @@
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 
 use color_eyre::{eyre::eyre, Result};
-use owo_colors::OwoColorize;
-
-use crate::board::Board;
-use crate::UnicodeBox;
 
 static BIT_MASK: [u16; 16] = [
     1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768,
@@ -42,11 +38,11 @@ pub fn search(board: Solver) -> Option<Solver> {
 // Source: https://www.sebastiansylvan.com/post/sudoku/
 #[derive(Clone, Copy)]
 pub struct Solver {
-    board: [[DigitMask; 9]; 9],
-    possible_blocks: [[[DigitMask; 9]; 3]; 3],
-    possible_rows: [[DigitMask; 9]; 9],
-    possible_cols: [[DigitMask; 9]; 9],
-    next_square_candidate: Option<(usize, usize)>,
+    pub board: [[DigitMask; 9]; 9],
+    pub possible_blocks: [[[DigitMask; 9]; 3]; 3],
+    pub possible_rows: [[DigitMask; 9]; 9],
+    pub possible_cols: [[DigitMask; 9]; 9],
+    pub next_square_candidate: Option<(usize, usize)>,
 }
 
 impl Solver {
@@ -244,36 +240,6 @@ impl Solver {
     }
 }
 
-impl From<&Board> for Solver {
-    fn from(value: &Board) -> Self {
-        let board = [[0x1ff; 9]; 9];
-
-        let possible_blocks = [[[0x1ff; 9]; 3]; 3];
-        let possible_rows = [[0x1ff; 9]; 9];
-        let possible_cols = [[0x1ff; 9]; 9];
-
-        let mut solver = Solver {
-            board,
-            possible_blocks,
-            possible_rows,
-            possible_cols,
-            next_square_candidate: None,
-        };
-
-        for (y, row) in (*value).squares().iter().enumerate() {
-            for (x, cell) in row.iter().enumerate() {
-                if *cell > 0 {
-                    let adjusted_cell = *cell - 1;
-                    solver
-                        .set_digit(x, y, adjusted_cell)
-                        .expect("Board setup should set digit without failure.");
-                }
-            }
-        }
-        solver
-    }
-}
-
 impl Debug for Solver {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for row in self.board.iter() {
@@ -287,42 +253,5 @@ impl Debug for Solver {
             }
         }
         Ok(())
-    }
-}
-
-impl Display for Solver {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{}", UnicodeBox::Top)?;
-
-        for y in 0..9 {
-            if y > 0 && y % 3 == 0 {
-                writeln!(f, "{}", UnicodeBox::Horizontal)?;
-            }
-
-            for x in 0..9 {
-                if x % 3 == 0 {
-                    write!(f, "{}", UnicodeBox::Vertical)?;
-                }
-
-                let cell = self.board[x][y];
-                if cell.count_ones() == 1 {
-                    let val = cell.trailing_zeros() + 1;
-                    write!(f, "{}", val.yellow())?;
-                    continue;
-                } else {
-                    let remaining = cell & 0xFF;
-
-                    let cell_repr = char::from_u32((0x2800 + remaining).into()).unwrap();
-                    if cell & 0x100 == 0x100 {
-                        write!(f, "{}", cell_repr.green())?;
-                    } else {
-                        write!(f, "{}", cell_repr.blue())?;
-                    }
-                }
-            }
-            writeln!(f, "{}", UnicodeBox::Vertical)?;
-        }
-
-        write!(f, "{}", UnicodeBox::Bottom)
     }
 }
