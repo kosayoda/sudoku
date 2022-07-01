@@ -19,7 +19,10 @@ pub fn run() -> Result<()> {
     let config = Arc::new(Config::default());
 
     let data = AppData::new(board, config.clone());
-    let app = App::new(&data).center().background(config.theme.bg.clone());
+    let app = App::new(&data)
+        // .debug_paint_layout()
+        .center()
+        .background(config.theme.bg.clone());
     let window = WindowDesc::new(app).resizable(true);
 
     AppLauncher::with_window(window)

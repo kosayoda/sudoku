@@ -1,7 +1,7 @@
 use druid::{
     widget::{BackgroundBrush, Container, Flex, Widget, WidgetExt},
-    BoxConstraints, Env, Event, EventCtx, KbKey, KeyEvent, LayoutCtx, LensExt, LifeCycle,
-    LifeCycleCtx, PaintCtx, Size, UpdateCtx, WidgetId,
+    BoxConstraints, Env, Event, EventCtx, KbKey, KeyEvent, LayoutCtx, LifeCycle, LifeCycleCtx,
+    PaintCtx, Size, UpdateCtx, WidgetId,
 };
 use tracing::debug;
 
@@ -22,25 +22,23 @@ impl Grid {
     pub fn new(cfg: &Config) -> Self {
         let mut column = Flex::column();
         for y in 0..9 {
-            let mut row = Flex::row();
-
             if y % 3 == 0 && y != 0 {
                 column.add_flex_spacer(BLOCK_SPACER_FLEX);
             }
 
+            let mut row = Flex::row();
             for x in 0..9 {
                 if x % 3 == 0 && x != 0 {
                     row.add_flex_spacer(BLOCK_SPACER_FLEX);
                 }
 
+                let position = CellPosition { x, y };
+                let cell = GridCell::new(position, cfg);
                 row.add_flex_child(
-                    GridCell::new(x, y, cfg).lens(
-                        AppData::board.then(Board::cells.as_ref().index(x).as_ref().index(y)),
-                    ),
+                    cell.with_id(position.to_widget_id()).lens(AppData::board),
                     CELL_FLEX,
                 );
             }
-
             column.add_flex_child(row, CELL_FLEX);
         }
 
@@ -84,25 +82,37 @@ impl Widget<AppData> for Grid {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct CellPosition {
+    x: u16,
+    y: u16,
+}
+
+impl CellPosition {
+    fn to_widget_id(self) -> WidgetId {
+        WidgetId::reserved(self.to_absolute())
+    }
+    fn to_absolute(self) -> u16 {
+        self.y * 9 + self.x
+    }
+}
+
 pub struct GridCell {
     cell: Container<CellValue>,
+    position: CellPosition,
 }
 
 impl GridCell {
-    pub fn new(x: usize, y: usize, cfg: &Config) -> Self {
-        let id: u16 = (y * 9 + x)
-            .try_into()
-            .expect("Cannot assign u16 id to a grid cell!");
-        let id = WidgetId::reserved(id);
+    pub fn new(position: CellPosition, cfg: &Config) -> Self {
         Self {
             cell: Cell::new(&cfg.theme)
-                .with_id(id)
                 .center()
                 .border(Keys::THEME_CELL_BORDER, Keys::CELL_BORDER_WIDTH),
+            position,
         }
     }
 
-    fn set_background_color(&mut self, value: CellValue, focused: bool, env: &Env) {
+    fn set_background_color(&mut self, value: &CellValue, focused: bool, env: &Env) {
         let color = match (value.is_fixed(), focused) {
             (true, true) => {
                 unreachable!("Unexpected: Grid cell is fixed but focused at the same time!")
@@ -114,12 +124,64 @@ impl GridCell {
 
         self.cell.set_background(BackgroundBrush::from(color));
     }
+
+    fn get_cell(&self, board: &Board) -> CellValue {
+        self.get_cell_at_pos(board, &self.position)
+    }
+
+    fn get_cell_mut<'a>(&self, board: &'a mut Board) -> &'a mut CellValue {
+        self.get_cell_at_pos_mut(board, &self.position)
+    }
+
+    fn get_cell_at_pos(&self, board: &Board, pos: &CellPosition) -> CellValue {
+        board.cells[usize::from(pos.x)][usize::from(pos.y)]
+    }
+
+    fn get_cell_at_pos_mut<'a>(
+        &self,
+        board: &'a mut Board,
+        pos: &CellPosition,
+    ) -> &'a mut CellValue {
+        &mut board.cells[usize::from(pos.x)][usize::from(pos.y)]
+    }
+
+    fn shift_focus(&self, key: &druid::KbKey, ctx: &mut EventCtx, data: &mut Board) {
+        let x_pos: usize = self.position.x.into();
+        let y_pos: usize = self.position.y.into();
+
+        let x: u16 = match key {
+            KbKey::ArrowRight => (x_pos + 1..9)
+                .find(|_x| !data.cells[*_x][y_pos].is_fixed())
+                .unwrap_or(x_pos),
+            KbKey::ArrowLeft => (0..x_pos)
+                .rev()
+                .find(|_x| !data.cells[*_x][y_pos].is_fixed())
+                .unwrap_or(x_pos),
+            _ => x_pos,
+        }
+        .try_into()
+        .unwrap();
+        let y: u16 = match key {
+            KbKey::ArrowUp => (0..y_pos)
+                .rev()
+                .find(|_y| !data.cells[x_pos][*_y].is_fixed())
+                .unwrap_or(y_pos),
+            KbKey::ArrowDown => (y_pos + 1..9)
+                .find(|_y| !data.cells[x_pos][*_y].is_fixed())
+                .unwrap_or(y_pos),
+            _ => y_pos,
+        }
+        .try_into()
+        .unwrap();
+        ctx.set_focus(WidgetId::reserved(y * 9 + x));
+    }
 }
 
-impl Widget<CellValue> for GridCell {
-    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut CellValue, env: &Env) {
-        if (*data).is_fixed() {
-            return self.cell.event(ctx, event, data, env);
+impl Widget<Board> for GridCell {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut Board, env: &Env) {
+        let mut value = *self.get_cell_mut(data);
+        if value.is_fixed() {
+            return self.cell.event(ctx, event, &mut value, env);
         }
 
         match event {
@@ -134,13 +196,19 @@ impl Widget<CellValue> for GridCell {
                         .filter(|&n| (1..=9).contains(&n));
 
                     if let Some(num) = valid_value {
-                        debug!("Cell set: {num}, was {data}");
-                        *data = CellValue::User(Some(num));
+                        debug!("Cell set: {num}, was {}", self.get_cell(data));
+                        *self.get_cell_mut(data) = CellValue::User(Some(num));
                     }
                 }
                 KbKey::Backspace | KbKey::Delete => {
-                    debug!("Cell cleared, was {data}");
-                    *data = CellValue::User(None);
+                    debug!("Cell cleared, was {}", self.get_cell(data));
+                    *self.get_cell_mut(data) = CellValue::User(None);
+                }
+                // Move focus between cells
+                KbKey::ArrowLeft | KbKey::ArrowRight | KbKey::ArrowUp | KbKey::ArrowDown => {
+                    if ctx.is_focused() {
+                        self.shift_focus(key, ctx, data);
+                    }
                 }
                 _ => {}
             },
@@ -155,50 +223,55 @@ impl Widget<CellValue> for GridCell {
             _ => {}
         };
 
-        self.cell.event(ctx, event, data, env);
+        self.cell.event(ctx, event, &mut value, env);
     }
 
-    fn lifecycle(
-        &mut self,
-        ctx: &mut LifeCycleCtx,
-        event: &LifeCycle,
-        data: &CellValue,
-        env: &Env,
-    ) {
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &Board, env: &Env) {
+        let value = self.get_cell(data);
         match event {
             LifeCycle::WidgetAdded => {
                 ctx.register_for_focus();
-                self.set_background_color(*data, false, env);
+                self.set_background_color(&value, false, env);
             }
             LifeCycle::FocusChanged(focused) => {
-                self.set_background_color(*data, *focused, env);
+                debug!("Focus is now on: {:?}", ctx.widget_id());
+                self.set_background_color(&value, *focused, env);
                 ctx.request_paint();
             }
             _ => {}
         }
 
-        self.cell.lifecycle(ctx, event, data, env)
+        self.cell.lifecycle(ctx, event, &value, env)
     }
 
-    fn update(&mut self, ctx: &mut UpdateCtx, old_data: &CellValue, data: &CellValue, env: &Env) {
-        self.set_background_color(*data, ctx.has_focus(), env);
-        self.cell.update(ctx, old_data, data, env);
+    fn update(&mut self, ctx: &mut UpdateCtx, old_data: &Board, data: &Board, env: &Env) {
+        let old_value = self.get_cell(old_data);
+        let value = self.get_cell(data);
+
+        self.set_background_color(&value, ctx.has_focus(), env);
+        self.cell.update(ctx, &old_value, &value, env);
     }
 
     fn layout(
         &mut self,
         ctx: &mut LayoutCtx,
         bc: &BoxConstraints,
-        data: &CellValue,
+        data: &Board,
         env: &Env,
     ) -> Size {
         // Ensure that the GridCell remains a square by taking the smaller of the two side lengths.
-        let size = bc.max().min_side().round().min(bc.max().max_side());
+        let mut size = bc.max().min_side().round().min(bc.max().max_side());
+
+        // Round to the nearest multiple of 2 to ensure different squares are the same size
+        size = size - size % 2.0;
         let constraints = bc.shrink_max_width_to(size).shrink_max_height_to(size);
-        self.cell.layout(ctx, &constraints, data, env)
+
+        let value = self.get_cell(data);
+        self.cell.layout(ctx, &constraints, &value, env)
     }
 
-    fn paint(&mut self, ctx: &mut PaintCtx, data: &CellValue, env: &Env) {
-        self.cell.paint(ctx, data, env);
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &Board, env: &Env) {
+        let value = self.get_cell(data);
+        self.cell.paint(ctx, &value, env);
     }
 }
