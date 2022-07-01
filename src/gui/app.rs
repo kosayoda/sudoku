@@ -9,8 +9,8 @@ pub fn run() -> Result<()> {
     let board_str =
         "000075400000000008080190000300001060000000034000068170204000603900000020530200000";
     let board: Board = board_str.try_into()?;
-
-    let window = WindowDesc::new(Grid::new()).resizable(true);
+    let grid = Grid::new().center();
+    let window = WindowDesc::new(grid).resizable(true);
     AppLauncher::with_window(window).launch(board)?;
     Ok(())
 }

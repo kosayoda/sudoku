@@ -1,7 +1,7 @@
 use druid::{
-    widget::{BackgroundBrush, Container, Flex, Label, Widget, WidgetExt},
-    BoxConstraints, Color, Env, Event, EventCtx, KbKey, KeyEvent, LayoutCtx, LensExt, LifeCycle,
-    LifeCycleCtx, PaintCtx, Size, UpdateCtx,
+    widget::{BackgroundBrush, Container, Flex, Painter, SizedBox, Widget, WidgetExt},
+    BoxConstraints, Color, Command, Data, Env, Event, EventCtx, KbKey, KeyEvent, LayoutCtx,
+    LensExt, LifeCycle, LifeCycleCtx, PaintCtx, RenderContext, Selector, Size, UpdateCtx, WidgetId,
 };
 use tracing::debug;
 
@@ -13,34 +13,35 @@ pub struct Grid {
 
 impl Grid {
     pub fn new() -> Self {
-        const SPACER: f64 = 0.02;
+        const SPACER: f64 = 0.05;
 
         let mut column = Flex::column();
         for y in 0..9 {
             let mut row = Flex::row();
+
+            if y % 3 == 0 && y != 0 {
+                column.add_flex_spacer(SPACER);
+            }
 
             for x in 0..9 {
                 if x % 3 == 0 && x != 0 {
                     row.add_flex_spacer(SPACER);
                 }
 
+                let id: u16 = (y * 9 + x)
+                    .try_into()
+                    .expect("Cannot assign u16 id to a grid cell!");
                 row.add_flex_child(
-                    GridCell::new().lens(Board::cells.as_ref().index(x).as_ref().index(y)),
+                    GridCell::new(id).lens(Board::cells.as_ref().index(x).as_ref().index(y)),
                     1.0,
                 );
             }
 
-            if y % 3 == 0 && y != 0 {
-                column.add_flex_spacer(SPACER);
-            }
-
             column.add_flex_child(row, 1.0);
         }
+
         Self {
-            display: column
-                .center()
-                .background(Color::BLACK)
-                .border(Color::grey(0.5), 0.5),
+            display: column.center().background(Color::BLACK),
         }
     }
 }
@@ -59,7 +60,8 @@ impl Widget<Board> for Grid {
         data: &Board,
         env: &Env,
     ) -> Size {
-        let side = bc.max().min_side();
+        let mut side = bc.max().min_side();
+        side = side - (side % 9.1);
         let size = Size::new(side, side);
         let constraints = BoxConstraints::new(size, size);
         self.display.layout(ctx, &constraints, data, env)
@@ -87,9 +89,13 @@ pub struct GridCell {
 }
 
 impl GridCell {
-    pub fn new() -> Self {
+    pub fn new(id: u16) -> Self {
+        let id = WidgetId::reserved(id);
         Self {
-            cell: Cell::new().center().border(Color::grey(0.5), 0.5),
+            cell: Cell::new()
+                .with_id(id)
+                .center()
+                .border(Color::grey(0.5), 1.0),
         }
     }
 
@@ -109,14 +115,12 @@ impl GridCell {
     }
 }
 
-impl Default for GridCell {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Widget<CellValue> for GridCell {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut CellValue, env: &Env) {
+        if (*data).is_fixed() {
+            return self.cell.event(ctx, event, data, env);
+        }
+
         match event {
             Event::KeyDown(KeyEvent { key, .. }) => match key {
                 KbKey::Character(c) => {
@@ -129,28 +133,22 @@ impl Widget<CellValue> for GridCell {
                         .filter(|&n| (1..=9).contains(&n));
 
                     if let Some(num) = valid_value {
-                        if (*data).is_fixed() {
-                            debug!("Cell set: {num}, was {data:?}");
-                            *data = CellValue::User(Some(num));
-                        }
+                        debug!("Cell set: {num}, was {data}");
+                        *data = CellValue::User(Some(num));
                     }
                 }
                 KbKey::Backspace | KbKey::Delete => {
-                    if (*data).is_fixed() {
-                        debug!("Cell cleared, was {data:?}");
-                        *data = CellValue::User(None);
-                    }
+                    debug!("Cell cleared, was {data}");
+                    *data = CellValue::User(None);
                 }
                 _ => {}
             },
             Event::MouseDown(_) => {
-                if !(*data).is_fixed() {
-                    debug!("Cell clicked, toggling focus");
-                    if ctx.has_focus() {
-                        ctx.resign_focus();
-                    } else {
-                        ctx.request_focus();
-                    }
+                debug!("Cell clicked, toggling focus");
+                if ctx.has_focus() {
+                    ctx.resign_focus();
+                } else {
+                    ctx.request_focus();
                 }
             }
             _ => {}
@@ -183,8 +181,6 @@ impl Widget<CellValue> for GridCell {
 
     fn update(&mut self, ctx: &mut UpdateCtx, old_data: &CellValue, data: &CellValue, env: &Env) {
         self.set_background_color(*data, ctx.has_focus());
-        ctx.request_paint();
-        // self.update_label();
         self.cell.update(ctx, old_data, data, env);
     }
 
@@ -195,7 +191,10 @@ impl Widget<CellValue> for GridCell {
         data: &CellValue,
         env: &Env,
     ) -> Size {
-        self.cell.layout(ctx, bc, data, env)
+        // Ensure that the GridCell remains a square by taking the smaller of the two side lengths.
+        let size = bc.max().min_side().round().min(bc.max().max_side());
+        let constraints = bc.shrink_max_width_to(size).shrink_max_height_to(size);
+        self.cell.layout(ctx, &constraints, data, env)
     }
 
     fn paint(&mut self, ctx: &mut PaintCtx, data: &CellValue, env: &Env) {

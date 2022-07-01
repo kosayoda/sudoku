@@ -6,7 +6,7 @@ use druid::{
 };
 use tracing::debug;
 
-#[derive(Data, Clone, Copy, Debug)]
+#[derive(Data, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CellValue {
     Fixed(usize),
     User(Option<usize>),
@@ -83,7 +83,6 @@ impl Widget<CellValue> for Cell {
     }
 
     fn update(&mut self, ctx: &mut UpdateCtx, old_data: &CellValue, data: &CellValue, env: &Env) {
-        debug!("Update");
         self.label.update(ctx, old_data, data, env);
     }
 
@@ -94,7 +93,8 @@ impl Widget<CellValue> for Cell {
         data: &CellValue,
         env: &Env,
     ) -> Size {
-        self.label.set_text_size(bc.max().min_side() * 0.5);
+        let size = bc.max().min_side();
+        self.label.set_text_size(size * 0.5);
         self.label.layout(ctx, bc, data, env)
     }
 
