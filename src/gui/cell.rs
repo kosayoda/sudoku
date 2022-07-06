@@ -94,17 +94,10 @@ impl Widget<CellValue> for Cell {
         data: &CellValue,
         env: &Env,
     ) -> Size {
-        let mut size = bc.max().min_side();
-
-        // Round the size further to be an odd number
-        if size % 2.0 == 0.0 {
-            size -= 1.0;
-        }
-        let ss = Size::new(size, size);
-        let constraints = BoxConstraints::new(ss, ss);
+        let size = bc.max().min_side();
 
         self.label.set_text_size(size * 0.5);
-        self.label.layout(ctx, &constraints, data, env)
+        self.label.layout(ctx, bc, data, env)
     }
 
     fn paint(&mut self, ctx: &mut PaintCtx, data: &CellValue, env: &Env) {
