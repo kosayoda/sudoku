@@ -58,10 +58,16 @@ impl Widget<AppData> for Grid {
         data: &AppData,
         env: &Env,
     ) -> Size {
-        let mut side = bc.max().min_side();
-        side = side - (side % TOTAL_FLEX);
-        let size = Size::new(side, side);
-        let constraints = BoxConstraints::new(size, size);
+        // Round the grid size to be a multiple of the flex size
+        let mut size = bc.max().min_side();
+        size = (size - (size % TOTAL_FLEX)).round();
+
+        // Round the grid size further to be an odd number
+        if size % 2.0 == 0.0 {
+            size -= 1.0;
+        }
+        let constraints = bc.shrink_max_width_to(size).shrink_max_height_to(size);
+        debug!("Grid constraints: {constraints:?}");
         self.display.layout(ctx, &constraints, data, env)
     }
 
@@ -188,21 +194,21 @@ impl Widget<Board> for GridCell {
             Event::KeyDown(KeyEvent { key, .. }) => match key {
                 KbKey::Character(c) => {
                     debug!("Character pressed: {c}");
-                    let valid_value: Option<usize> = c
+                    let valid_value: Option<u16> = c
                         .chars()
                         .last()
                         .and_then(|c| c.to_digit(10))
-                        .and_then(|n| usize::try_from(n).ok())
+                        .and_then(|n| u16::try_from(n).ok())
                         .filter(|&n| (1..=9).contains(&n));
 
                     if let Some(num) = valid_value {
                         debug!("Cell set: {num}, was {}", self.get_cell(data));
-                        *self.get_cell_mut(data) = CellValue::User(Some(num));
+                        *self.get_cell_mut(data) = CellValue::Unfixed(Some(num));
                     }
                 }
                 KbKey::Backspace | KbKey::Delete => {
                     debug!("Cell cleared, was {}", self.get_cell(data));
-                    *self.get_cell_mut(data) = CellValue::User(None);
+                    *self.get_cell_mut(data) = CellValue::Unfixed(None);
                 }
                 // Move focus between cells
                 KbKey::ArrowLeft | KbKey::ArrowRight | KbKey::ArrowUp | KbKey::ArrowDown => {
@@ -259,12 +265,20 @@ impl Widget<Board> for GridCell {
         data: &Board,
         env: &Env,
     ) -> Size {
-        // Ensure that the GridCell remains a square by taking the smaller of the two side lengths.
-        let mut size = bc.max().min_side().round().min(bc.max().max_side());
+        // Ensure that the GridCell remains a square by taking the average of the two side lengths;
+        let mut size = bc.max().min_side();
+        debug!("{:?}: {}", self.position, size);
 
         // Round to the nearest multiple of 2 to ensure different squares are the same size
-        size = size - size % 2.0;
+        size = (size - size % 3.0).round();
+
+        // Round the size further to be an odd number
+        if size % 2.0 == 0.0 {
+            size -= 1.0;
+        }
+
         let constraints = bc.shrink_max_width_to(size).shrink_max_height_to(size);
+        debug!("{:?}", constraints);
 
         let value = self.get_cell(data);
         self.cell.layout(ctx, &constraints, &value, env)

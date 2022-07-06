@@ -4,13 +4,19 @@ use druid::{
     widget::Label, BoxConstraints, Data, Env, Event, EventCtx, LayoutCtx, LifeCycle, LifeCycleCtx,
     PaintCtx, Size, UpdateCtx, Widget,
 };
+use tracing::debug;
 
 use crate::config::ThemeConfig;
 
+// pub struct Unfixed {
+//     value: Option<usize>,
+//     candidates:
+// }
+
 #[derive(Data, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CellValue {
-    Fixed(usize),
-    User(Option<usize>),
+    Fixed(u16),
+    Unfixed(Option<u16>),
 }
 
 impl CellValue {
@@ -21,15 +27,15 @@ impl CellValue {
 
 impl Default for CellValue {
     fn default() -> Self {
-        Self::User(None)
+        Self::Unfixed(None)
     }
 }
 
-impl From<CellValue> for Option<usize> {
+impl From<CellValue> for Option<u16> {
     fn from(cell: CellValue) -> Self {
         match cell {
             CellValue::Fixed(val) => Some(val),
-            CellValue::User(val) => val,
+            CellValue::Unfixed(val) => val,
         }
     }
 }
@@ -40,10 +46,10 @@ impl Display for CellValue {
             CellValue::Fixed(val) => {
                 write!(f, "{val}")
             }
-            CellValue::User(Some(val)) => {
+            CellValue::Unfixed(Some(val)) => {
                 write!(f, "{val}")
             }
-            CellValue::User(None) => {
+            CellValue::Unfixed(None) => {
                 write!(f, "")
             }
         }
@@ -88,9 +94,17 @@ impl Widget<CellValue> for Cell {
         data: &CellValue,
         env: &Env,
     ) -> Size {
-        let size = bc.max().min_side();
+        let mut size = bc.max().min_side();
+
+        // Round the size further to be an odd number
+        if size % 2.0 == 0.0 {
+            size -= 1.0;
+        }
+        let ss = Size::new(size, size);
+        let constraints = BoxConstraints::new(ss, ss);
+
         self.label.set_text_size(size * 0.5);
-        self.label.layout(ctx, bc, data, env)
+        self.label.layout(ctx, &constraints, data, env)
     }
 
     fn paint(&mut self, ctx: &mut PaintCtx, data: &CellValue, env: &Env) {

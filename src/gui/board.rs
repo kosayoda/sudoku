@@ -23,7 +23,7 @@ impl TryFrom<&str> for Board {
             let x = index.rem_euclid(9);
             let y = index.div_euclid(9);
 
-            if let Some(Ok(pos)) = cell.to_digit(10).map(usize::try_from) {
+            if let Some(Ok(pos)) = cell.to_digit(10).map(u16::try_from) {
                 if pos > 0 {
                     cells[x][y] = CellValue::Fixed(pos);
                 }
@@ -55,9 +55,9 @@ impl From<&Board> for Solver {
         for (y, row) in (*value).cells.iter().enumerate() {
             for (x, cell) in row.iter().enumerate() {
                 match *cell {
-                    CellValue::Fixed(val) | CellValue::User(Some(val)) => {
+                    CellValue::Fixed(val) | CellValue::Unfixed(Some(val)) => {
                         solver
-                            .set_digit(x, y, val - 1)
+                            .set_digit(x, y, (val - 1).into())
                             .expect("Board setup should set digit without failure.");
                     }
                     _ => (),
