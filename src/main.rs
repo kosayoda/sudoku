@@ -2,8 +2,6 @@ use color_eyre::Result;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 
-use sudoku::gui;
-
 fn main() -> Result<()> {
     color_eyre::install()?;
 
@@ -11,10 +9,6 @@ fn main() -> Result<()> {
         .with_max_level(Level::DEBUG)
         .finish();
     tracing::subscriber::set_global_default(log_subscriber)?;
-
-    info!("Launching GUI app!");
-    gui::run()?;
-    info!("Exited GUI app!");
 
     Ok(())
 }
